@@ -2,4 +2,6 @@
 name = "find-me-a-house"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "marimo>=0.14.7",
+]
