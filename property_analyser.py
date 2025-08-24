@@ -66,64 +66,8 @@ def _(formatted_address, mo):
 
 
 @app.cell
-def _(gmaps, pl):
-    def get_nearby(
-        origin: tuple, search_term: str, travel_mode: str = "walking"
-    ) -> pl.DataFrame:
-        places_nearby_result = gmaps.places_nearby(
-            location=origin, keyword=search_term, rank_by="distance"
-        )
-
-        places_nearby_ids = [
-            "place_id:" + place["place_id"]
-            for place in places_nearby_result["results"]
-        ]
-
-        distance_matrix_result = gmaps.distance_matrix(
-            origins=origin, destinations=places_nearby_ids, mode=travel_mode
-        )
-
-        destinations = distance_matrix_result["destination_addresses"]
-        distances = distance_matrix_result["rows"][0]["elements"]
-
-        places_nearby_result_data = places_nearby_result["results"]
-
-        places_nearby_df = pl.DataFrame(
-            [
-                {
-                    "Id": result.get("place_id"),
-                    "Name": result.get("name"),
-                    "Address": result.get("vicinity"),
-                    "Rating": result.get("rating"),
-                    "Total Ratings": result.get("user_ratings_total"),
-                }
-                for result in places_nearby_result_data
-            ]
-        )
-
-        distance_matrix_df = pl.DataFrame(
-            {
-                "Id": [id.replace("place_id:", "") for id in places_nearby_ids],
-                "Destination": destinations,
-                "Distance": [d["distance"]["text"] for d in distances],
-                f"{travel_mode} Duration": [d["duration"]["text"] for d in distances],
-            }
-        )
-
-        return places_nearby_df.join(distance_matrix_df, on="Id").select(
-            "Name",
-            "Address",
-            "Rating",
-            "Total Ratings",
-            "Distance",
-            f"{travel_mode} Duration",
-        )
-    return
-
-
-@app.cell
 def _(gmaps, origin, pl, search_term):
-    def get_nearby_2(origin: tuple, search_term: str):
+    def get_nearby(origin: tuple, search_term: str):
         places_nearby_result = gmaps.places_nearby(
             location=origin, keyword=search_term, rank_by="distance"
         )
@@ -185,21 +129,22 @@ def _(gmaps, origin, pl, search_term):
 
         return output_df
 
-    get_nearby_2(origin=origin, search_term=search_term.value)
-    return (get_nearby_2,)
+    get_nearby(origin=origin, search_term=search_term.value)
+    return (get_nearby,)
 
 
 @app.cell
 def _(
     folium,
     formatted_address,
-    get_nearby_2,
+    get_nearby,
     mo,
     origin,
     origin_lat,
     origin_lng,
+    search_term,
 ):
-    poi = get_nearby_2(origin=origin, search_term="gym")
+    poi = get_nearby(origin=origin, search_term=search_term.value)
 
     map = folium.Map(location=[origin_lat, origin_lng], zoom_start=15)
     folium.Marker([origin_lat, origin_lng], tooltip=formatted_address, icon=folium.Icon(icon="home")).add_to(map)
