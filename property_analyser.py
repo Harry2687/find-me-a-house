@@ -23,8 +23,12 @@ def _():
 @app.cell
 def _(mo, os):
     # Define Marimo input objects
-    address = mo.ui.text_area(value=os.getenv("MY_ADDRESS"), placeholder="Enter property address...")
-    workplace = mo.ui.text_area(value=os.getenv("WORK"), placeholder="Enter work address...")
+    address = mo.ui.text_area(
+        value=os.getenv("MY_ADDRESS"), placeholder="Enter property address..."
+    )
+    workplace = mo.ui.text_area(
+        value=os.getenv("WORK"), placeholder="Enter work address..."
+    )
     return address, workplace
 
 
@@ -54,21 +58,83 @@ def _(address, gmaps):
 
 
 @app.cell
-def _(gmaps, next_weekday_at_830, origin_lat, origin_lng, workplace):
-    work_directions = gmaps.directions(origin=(origin_lat, origin_lng), destination=workplace.value, mode="transit", arrival_time=next_weekday_at_830())
-    duration = work_directions[0]["legs"][0]["duration"]["text"]
-    distance = work_directions[0]["legs"][0]["distance"]["text"]
-    return distance, duration
+def _(formatted_address, mo):
+    mo.md(f"""Address search result: {formatted_address}""")
+    return
 
 
 @app.cell
-def _(distance, duration, formatted_address, mo):
-    mo.md(
-        f"""
-    Address search result: {formatted_address}\n
-    It will take {duration} to travel {distance} to work.
-    """
+def _(gmaps, next_weekday_at_830, origin_lat, origin_lng, workplace):
+    work_directions_pt = gmaps.directions(
+        origin=(origin_lat, origin_lng),
+        destination=workplace.value,
+        mode="transit",
+        arrival_time=next_weekday_at_830(),
     )
+
+    duration_text_pt = work_directions_pt[0]["legs"][0]["duration"]["text"]
+    distance_text_pt = work_directions_pt[0]["legs"][0]["distance"]["text"]
+    duration_value_pt = work_directions_pt[0]["legs"][0]["duration"]["value"]
+    distance_value_pt = work_directions_pt[0]["legs"][0]["distance"]["value"]
+
+    work_directions_car = gmaps.directions(
+        origin=(origin_lat, origin_lng),
+        destination=workplace.value,
+        mode="driving",
+        arrival_time=next_weekday_at_830(),
+    )
+
+    duration_text_car = work_directions_car[0]["legs"][0]["duration"]["text"]
+    distance_text_car = work_directions_car[0]["legs"][0]["distance"]["text"]
+    duration_value_car = work_directions_car[0]["legs"][0]["duration"]["value"]
+    distance_value_car = work_directions_car[0]["legs"][0]["distance"]["value"]
+
+    time_diff_car_pt = abs(
+        round(duration_value_car / 60) - round(duration_value_pt / 60)
+    )
+
+    if duration_value_car > duration_value_pt:
+        work_duration_pt_stat_dir = "increase"
+        work_duration_car_stat_dir = "decrease"
+    elif duration_value_car < duration_value_pt:
+        work_duration_pt_stat_dir = "decrease"
+        work_duration_car_stat_dir = "increase"
+    else:
+        work_duration_pt_stat_dur = None
+        work_duration_car_stat_dir = None
+    return (
+        duration_text_car,
+        duration_text_pt,
+        time_diff_car_pt,
+        work_duration_car_stat_dir,
+        work_duration_pt_stat_dir,
+    )
+
+
+@app.cell
+def _(
+    duration_text_car,
+    duration_text_pt,
+    mo,
+    time_diff_car_pt,
+    work_duration_car_stat_dir,
+    work_duration_pt_stat_dir,
+):
+    work_duration_pt_stat = mo.stat(
+        value=duration_text_pt,
+        label="Public Transport Commute Time",
+        caption=f"{time_diff_car_pt} mins compared to driving",
+        direction=work_duration_pt_stat_dir,
+    )
+
+    work_duration_car_stat = mo.stat(
+        value=duration_text_car,
+        label="Driving Commute Time",
+        caption=f"{time_diff_car_pt} mins compared to public transport",
+        direction=work_duration_car_stat_dir,
+    )
+
+    mo.hstack([work_duration_pt_stat, work_duration_car_stat], justify="center")
     return
 
 
@@ -92,18 +158,26 @@ def _(
         map,
         get_nearby((origin_lat, origin_lng), "woolworths or coles or aldi"),
         icon=folium.Icon(
-            color="green", icon="basket-shopping", prefix="fa", icon_color="white"
+            icon="basket-shopping", prefix="fa", color="green", icon_color="white"
         ),
     )
     plot_nearby(
         map,
         get_nearby((origin_lat, origin_lng), "gym"),
         icon=folium.Icon(
-            color="red", icon="dumbbell", prefix="fa", icon_color="white"
+            icon="dumbbell", prefix="fa", color="red", icon_color="white"
         ),
     )
 
     mo.Html(map._repr_html_())
+    return
+
+
+@app.cell
+def _(folium, origin_lat, origin_lng):
+    import geopandas as gpd
+
+    sa1_map = folium.Map(location=[origin_lat, origin_lng], zoom_start=15)
     return
 
 
@@ -114,7 +188,7 @@ def _(datetime):
 
         while date.weekday() > 4:
             date += datetime.timedelta(days=1)
-    
+
         return datetime.datetime.combine(date, datetime.time(8, 30))
     return (next_weekday_at_830,)
 
@@ -162,10 +236,18 @@ def _(gmaps, pl):
         distance_matrix_df = pl.DataFrame(
             {
                 "Id": [id.replace("place_id:", "") for id in places_nearby_ids],
-                "Walking Distance": [d["distance"]["text"] for d in distances_walking],
-                "Walking Duration": [d["duration"]["text"] for d in distances_walking],
-                "Driving Distance": [d["distance"]["text"] for d in distances_driving],
-                "Driving Duration": [d["duration"]["text"] for d in distances_driving],
+                "Walking Distance": [
+                    d["distance"]["text"] for d in distances_walking
+                ],
+                "Walking Duration": [
+                    d["duration"]["text"] for d in distances_walking
+                ],
+                "Driving Distance": [
+                    d["distance"]["text"] for d in distances_driving
+                ],
+                "Driving Duration": [
+                    d["duration"]["text"] for d in distances_driving
+                ],
             }
         )
 
@@ -178,7 +260,7 @@ def _(gmaps, pl):
             "Walking Distance",
             "Walking Duration",
             "Driving Distance",
-            "Driving Duration"
+            "Driving Duration",
         )
 
         return output_df
@@ -187,13 +269,15 @@ def _(gmaps, pl):
 
 @app.cell
 def _(folium, pl):
-    def plot_nearby(map: folium.Map, nearby_points: pl.DataFrame, icon: folium.Icon):
+    def plot_nearby(
+        map: folium.Map, nearby_points: pl.DataFrame, icon: folium.Icon
+    ):
         for row in nearby_points.iter_rows(named=True):
             folium.Marker(
-                [row["lat"], row["lng"]], 
-                tooltip=row["Name"], 
-                popup=f"Walking Duration: {row["Walking Duration"]}\nDriving Duration: {row["Driving Duration"]}",
-                icon=icon
+                [row["lat"], row["lng"]],
+                tooltip=row["Name"],
+                popup=f"Walking Duration: {row['Walking Duration']}\nDriving Duration: {row['Driving Duration']}",
+                icon=icon,
             ).add_to(map)
 
         return None
