@@ -178,6 +178,71 @@ def _(folium, origin_lat, origin_lng):
     import geopandas as gpd
 
     sa1_map = folium.Map(location=[origin_lat, origin_lng], zoom_start=15)
+
+    sa1_gdf = gpd.read_file("property_analyser/data/SA1_2021_AUST_SHP_GDA2020/SA1_2021_AUST_GDA2020.shp")
+    # sa1_gdf = sa1_gdf[sa1_gdf["GCC_NAME21"] == "Greater Perth"]
+    # sa1_gdf = sa1_gdf[sa1_gdf["SA4_NAME21"] == "Perth - Inner"]
+
+    folium.GeoJson(sa1_gdf).add_to(sa1_map)
+
+    # mo.Html(sa1_map._repr_html_())
+    return (sa1_gdf,)
+
+
+@app.cell
+def _(sa1_gdf):
+    sa1_gdf
+    return
+
+
+@app.cell
+def _(origin_lat, origin_lng, sa1_gdf):
+    from shapely.geometry import Point
+
+    origin_point = Point(origin_lng, origin_lat)
+    sa1_gdf[sa1_gdf.geometry.contains(origin_point)]
+    return
+
+
+@app.cell
+def _(sa1_gdf):
+    sa1_gdf.crs
+    return
+
+
+@app.cell
+def _():
+    import pandas as pd
+
+    social_housing = pd.read_parquet("property_analyser/data/atlas_rent_social_housing.parquet")
+
+    social_housing
+    return (social_housing,)
+
+
+@app.cell
+def _(
+    folium,
+    formatted_address,
+    mo,
+    origin_lat,
+    origin_lng,
+    sa1_gdf,
+    social_housing,
+):
+    social_housing_gdf = sa1_gdf.merge(social_housing, left_on="SA1_CODE21", right_on="SA1", how="inner")
+
+    social_housing_map = folium.Map(location=[origin_lat, origin_lng], zoom_start=15)
+    folium.Marker(
+        [origin_lat, origin_lng],
+        tooltip=formatted_address,
+        icon=folium.Icon(icon="home"),
+    ).add_to(social_housing_map)
+
+    # folium.GeoJson(social_housing_gdf).add_to(social_housing_map)
+    social_housing_gdf.explore(column="Number", cmap="bwr", m=social_housing_map)
+
+    mo.Html(social_housing_map._repr_html_())
     return
 
 
