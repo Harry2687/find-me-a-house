@@ -8,16 +8,20 @@ app = marimo.App(width="medium")
 def _():
     import marimo as mo
     from dotenv import load_dotenv
-    import googlemaps
+
     import os
     import polars as pl
     import folium
-    import datetime
+
+    from mapping_functions import (
+        gmaps,
+        next_weekday_at_830,
+        get_nearby,
+        plot_nearby,
+    )
 
     load_dotenv()
-
-    gmaps = googlemaps.Client(key=os.getenv("GMAPS_API_KEY"))
-    return folium, gmaps, mo, os
+    return folium, get_nearby, gmaps, mo, next_weekday_at_830, os, plot_nearby
 
 
 @app.cell
@@ -180,6 +184,7 @@ def _(folium, origin_lat, origin_lng):
     sa1_map = folium.Map(location=[origin_lat, origin_lng], zoom_start=15)
 
     sa1_gdf = gpd.read_file("property_analyser/data/SA1_2021_AUST_SHP_GDA2020/SA1_2021_AUST_GDA2020.shp")
+    sa1_gdf = sa1_gdf[sa1_gdf["STE_NAME21"] == "Western Australia"]
     # sa1_gdf = sa1_gdf[sa1_gdf["GCC_NAME21"] == "Greater Perth"]
     # sa1_gdf = sa1_gdf[sa1_gdf["SA4_NAME21"] == "Perth - Inner"]
 
@@ -240,7 +245,7 @@ def _(
     ).add_to(social_housing_map)
 
     # folium.GeoJson(social_housing_gdf).add_to(social_housing_map)
-    social_housing_gdf.explore(column="Number", cmap="bwr", m=social_housing_map)
+    social_housing_gdf.explore(column="Percentage", cmap="bwr", vmin=0, vmax=0.1, m=social_housing_map)
 
     mo.Html(social_housing_map._repr_html_())
     return

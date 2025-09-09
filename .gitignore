@@ -1,4 +1,5 @@
-__marimo__
+**__marimo__**
+**__pycache__**
+**.DS_Store**
 uv.lock
 .env
-**.DS_Store**
