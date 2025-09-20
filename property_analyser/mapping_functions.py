@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.15.2"
+__generated_with = "0.15.3"
 app = marimo.App(width="medium")
 
 with app.setup:
@@ -113,6 +113,63 @@ def plot_nearby(
         ).add_to(map)
 
     return None
+
+
+@app.function
+def get_commute_stats(origin: tuple, destination: tuple, arrival_time: datetime.datetime):
+    work_directions_pt = gmaps.directions(
+        origin=origin,
+        destination=destination,
+        mode="transit",
+        arrival_time=arrival_time,
+    )
+    
+    duration_text_pt = work_directions_pt[0]["legs"][0]["duration"]["text"]
+    distance_text_pt = work_directions_pt[0]["legs"][0]["distance"]["text"]
+    duration_value_pt = work_directions_pt[0]["legs"][0]["duration"]["value"]
+    distance_value_pt = work_directions_pt[0]["legs"][0]["distance"]["value"]
+    
+    work_directions_car = gmaps.directions(
+        origin=origin,
+        destination=destination,
+        mode="driving",
+        arrival_time=arrival_time,
+    )
+    
+    duration_text_car = work_directions_car[0]["legs"][0]["duration"]["text"]
+    distance_text_car = work_directions_car[0]["legs"][0]["distance"]["text"]
+    duration_value_car = work_directions_car[0]["legs"][0]["duration"]["value"]
+    distance_value_car = work_directions_car[0]["legs"][0]["distance"]["value"]
+    
+    time_diff_car_pt = abs(
+        round(duration_value_car / 60) - round(duration_value_pt / 60)
+    )
+    
+    if duration_value_car > duration_value_pt:
+        work_duration_pt_stat_dir = "increase"
+        work_duration_car_stat_dir = "decrease"
+    elif duration_value_car < duration_value_pt:
+        work_duration_pt_stat_dir = "decrease"
+        work_duration_car_stat_dir = "increase"
+    else:
+        work_duration_pt_stat_dur = None
+        work_duration_car_stat_dir = None
+
+    work_duration_pt_stat = mo.stat(
+        value=duration_text_pt,
+        label="Public Transport Commute Time",
+        caption=f"{time_diff_car_pt} mins compared to driving",
+        direction=work_duration_pt_stat_dir,
+    )
+    
+    work_duration_car_stat = mo.stat(
+        value=duration_text_car,
+        label="Driving Commute Time",
+        caption=f"{time_diff_car_pt} mins compared to public transport",
+        direction=work_duration_car_stat_dir,
+    )
+
+    return [work_duration_pt_stat, work_duration_car_stat]
 
 
 if __name__ == "__main__":
